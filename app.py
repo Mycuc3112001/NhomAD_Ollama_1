@@ -4,7 +4,6 @@ from datetime import datetime
 
 # =============================
 # 1️⃣ Cấu hình & UI Setup
-# (Giữ nguyên phần này)
 # =============================
 st.set_page_config(page_title="LLM Tool - Ollama (Local)", layout="centered")
 st.markdown(
@@ -26,15 +25,16 @@ st.title("🐳 LLM Tool - Ollama (Local)")
 st.write("Ứng dụng sử dụng **Ollama API cục bộ**")
 
 # =============================
-# 2️⃣ Ollama Client (Thay thế OpenAI)
+# 2️⃣ Ollama Client & Mô hình
 # =============================
 client = OpenAI(
     base_url="http://localhost:11434/v1",
     api_key="ollama_key_placeholder"
 )
 
-# Mô hình cục bộ
+# Đặt mô hình Gemma3:270m
 OLLAMA_MODEL = "gemma3:270m"
+
 # =============================
 # 3️⃣ Lưu lịch sử
 # =============================
@@ -50,7 +50,8 @@ default_index = 0
 model = st.selectbox("Mô hình đang chạy trên Ollama", model_names, index=default_index, disabled=True)
 
 st.warning(
-    f"**Lưu ý:** Ứng dụng đang chạy mô hình **{OLLAMA_MODEL}** cục bộ. Vui lòng đảm bảo Ollama đang chạy và kiên nhẫn chờ đợi do hạn chế về tài nguyên.")
+    f"**Lưu ý:** Ứng dụng đang chạy mô hình **{OLLAMA_MODEL}** cục bộ. Vui lòng đảm bảo Ollama đang chạy và kiên nhẫn chờ đợi do hạn chế về tài nguyên."
+)
 
 col1, col2 = st.columns([3, 1])
 with col2:
@@ -63,39 +64,26 @@ if clear:
 
 st.subheader("📝 Nhập dữ liệu")
 
-# --- ĐIỀU CHỈNH TASK_PROMPTS TẠI ĐÂY ---
+# --- TASK PROMPTS ---
 TASK_PROMPTS = {
-    # Thêm ràng buộc "chỉ trả về..." và vai trò chuyên gia
     "Tóm tắt": "Bạn là chuyên gia tóm tắt. Tóm tắt nội dung sau bằng tiếng Việt, tập trung vào các ý chính và rút gọn thành 1-2 câu. Chỉ trả về nội dung tóm tắt:",
-
-    # Yêu cầu ngôn ngữ cụ thể và không giải thích
     "Dịch sang tiếng Pháp": "Bạn là chuyên gia dịch thuật tiếng Pháp. Dịch câu sau sang tiếng Pháp chuẩn, chỉ trả về nội dung dịch (không kèm theo bất kỳ giải thích, chào hỏi, hay tiêu đề nào khác):",
-
-    # Giữ vai trò thân thiện, yêu cầu dùng từ ngữ đơn giản
     "Giải thích đơn giản": "Bạn là một giáo viên thân thiện. Giải thích nội dung sau bằng ngôn ngữ cực kỳ đơn giản, dễ hiểu, chỉ dùng từ ngữ dành cho học sinh lớp 5:",
-
-    # Ràng buộc format output cụ thể
     "Trích xuất từ khóa": "Trích xuất 5 từ khóa hoặc cụm từ quan trọng nhất từ văn bản sau. Mỗi từ khóa phải nằm trên một dòng riêng biệt, không đánh số thứ tự và không có ký tự đặc biệt nào khác:",
-
-    # Yêu cầu cú pháp code và giải thích ngắn gọn
     "Tạo mã Python": "Bạn là một lập trình viên Python chuyên nghiệp. Viết mã Python để thực hiện yêu cầu sau, kèm theo giải thích ngắn gọn. Đặt mã Python trong khối Markdown ````python ... ````:",
 }
-# --- KẾT THÚC ĐIỀU CHỈNH ---
 
 task = st.radio("Chọn tác vụ", list(TASK_PROMPTS.keys()), horizontal=True)
 text = st.text_area("Nội dung đầu vào", height=180, placeholder="Nhập đoạn văn hoặc yêu cầu...", key="input_text")
 st.divider()
 
-
 # =============================
 # 5️⃣ Hàm gọi Ollama API
-# (Giữ nguyên phần này)
 # =============================
 def get_ollama_response(model, prompt, output_placeholder, task):
     full_response = ""
     st.info(f"Đang xử lý bằng mô hình: **{model}** trên Ollama...")
     error_msg = None
-
     try:
         response = client.chat.completions.create(
             model=model,
@@ -103,26 +91,21 @@ def get_ollama_response(model, prompt, output_placeholder, task):
             temperature=0.7
         )
         full_response = response.choices[0].message.content
-
         if task == "Tạo mã Python":
             output_placeholder.code(full_response, language="python")
         else:
             output_placeholder.markdown(full_response)
-
         st.success("✅ Hoàn tất.")
-
     except Exception as e:
         if "Connection" in str(e) or "Failed to establish a new connection" in str(e):
-            error_msg = f"❌ Lỗi kết nối: Ollama có đang chạy không? Vui lòng kiểm tra dịch vụ!"
+            error_msg = "❌ Lỗi kết nối: Ollama có đang chạy không? Vui lòng kiểm tra dịch vụ!"
         else:
             error_msg = f"❌ Đã xảy ra lỗi: {e}"
         st.error(error_msg)
-
     return full_response, error_msg
 
-
 # =============================
-# 6️⃣, 7️⃣, 8️⃣ Phần còn lại của code (Giữ nguyên)
+# 6️⃣ Lưu kết quả ra file
 # =============================
 def save_result(task, model, text, result):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -138,7 +121,9 @@ def save_result(task, model, text, result):
         f.write(result.strip() + "\n")
     return filename
 
-
+# =============================
+# 7️⃣ Chạy tác vụ
+# =============================
 if st.button("Chạy tác vụ"):
     if not text.strip():
         st.warning("Vui lòng nhập nội dung trước khi xử lý.")
@@ -147,7 +132,6 @@ if st.button("Chạy tác vụ"):
         prompt = f"{TASK_PROMPTS[task]}\n\n{text}"
         st.subheader("📝 Kết quả")
         output_box = st.empty()
-
         result, error_msg = get_ollama_response(current_model, prompt, output_box, task)
 
         if not error_msg:
@@ -173,6 +157,9 @@ if st.button("Chạy tác vụ"):
             except Exception:
                 st.warning("Không thể tạo file tải xuống.")
 
+# =============================
+# 8️⃣ Hiển thị lịch sử
+# =============================
 if st.session_state.history:
     st.divider()
     st.subheader("📚 Lịch sử hội thoại")
